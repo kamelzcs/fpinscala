@@ -45,6 +45,21 @@ object Par {
       if (run(es)(cond).get) t(es) // Notice we are blocking on the result of `cond`.
       else f(es)
 
+  def lazyUnit[A](a: => A): Par[A] = fork(unit(a))
+
+  def asyncF[A,B](f: A => B): A => Par[B] =
+    a => lazyUnit(f(a))
+
+  def sequence_simple[A](l: List[Par[A]]): Par[List[A]] =
+    l.foldRight[Par[List[A]]](unit(List()))((h, t) => map2(h, t)(_::_))
+
+
+  def parFilter[A](l: List[A])(f: A => Boolean): Par[List[A]] = {
+    val pars: List[Par[List[A]]] =
+      l map (asyncF(a => if (f(a)) List(a) else List()))
+    map(sequence_simple(pars))(_.flatten)
+  }
+
   /* Gives us infix syntax for `Par`. */
   implicit def toParOps[A](p: Par[A]): ParOps[A] = new ParOps(p)
 
